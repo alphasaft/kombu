@@ -1,0 +1,116 @@
+---- Tutoriel Kombu ----
+
+
+1.0] Qu'est-ce que Kombu ?
+
+1.1] Présentation
+
+Kombu (pour Compiler Builder) est un outil très efficace pour créer votre propre langage.
+Il permet d'écrire la grammaire de celui-ci, mais aussi de programmer ce qu'il faudra faire pour chaque instruction.
+
+Sa syntaxe peut sembler bizarre, ou anormale par rapport à d'autres langages de programmation, tels que python ou java,
+mais elle permet de construire beaucoup plus facilement des nouveaux langages que ceux-ci.
+
+Si vous voulez essayer, lisez ce tutoriel !
+
+
+1.2] Connaissances nécessaires
+
+Kombu est un langage hybride, basé à la fois sur sa propre syntaxe mais aussi sur celle du python. Bien entendu,
+vous devrez donc apprendre celui-ci, si ce n'est pas déjà fait, le niveau requis dépendra de ce que vous voulez faire.
+Sinon, il suffit d'être motivé !
+
+Commençons !
+
+
+2.0] Les bases
+
+2.1] Comment fonctionne Kombu ?
+
+Lorsque vous écrivez et compilez un script kombu, il vous renvoie un programme python composé de 3 classes :
+
+- un Parser : basé sur la classe "BaseParser", il prend un script écrit dans votre language en entrée, généralement un fichier .cl (langage créé), et retourne un AST, une façon de le représenter plus facilement qu'un simple texte brut ;
+- un NodeWalker : il prend l'objet AST produit par le Parser et l'évalue ;
+- un Compiler : il n'a qu'une seule méthode, Compiler.compiler(src). Avec le Parser et le NodeWalker générés,
+il analyse le programme source et évalue l'AST qui en résulte.
+
+
+
+À la fin de ce fichier, vous trouverez ces lignes (-X- peut changer) :
+
+SRC = "" # Input
+
+myCompiler = -X-Compiler()
+myCompiler.compile(SRC)
+
+Il suffit de modifier la ligne "# input" avec un programme dans votre language, et de lancer le script ; il l'exécutera normalement,
+si le script kombu de base était correct.
+
+Maintenant qu'on a fait le tour du fonctionnement interne de Kombu, on peut passer à la pratique !
+
+
+2.2] Pour bien démarrer...
+
+On va d'abord devoir créer un projet Kombu. Avec la commande "kombu" fournie, ce sera facile.
+
+Celle-ci nous permet de faire beaucoup de choses ; Tapez 'kombu -h' ou 'kombu '--help' pour une description détaillée.
+
+Nous allons tout d'abord utiliser son option '-p NOMDUPROJET'.
+Tapez "kombu -p HelloWorld" ; cela va créer un répertoire nommé "HelloWorld" contenant un fichier main.kb, et un
+répertoire kblibs vide. Déplacez-vous ensuite à l'intérieur en utilisant "cd HelloWorld".
+
+Pour que ce soit plus agréable, on va utiliser un éditeur kombu avec coloration syntaxique.
+Utilisez "kombu -e -f main.kb" pour le démarrer.
+
+Nous pouvons maintenant commencer à écrire notre premier script kombu.
+
+
+
+2.3] Notre premier programme : Le Hello World
+
+2.3.1] Un peu de grammaire
+
+On va commencer tout simple : on va créer un miniscule langage, ne possédant qu'une seule instruction disponible : on
+pourra juste écrire "HW" (comme HelloWorld, je n'ai pas cherché très loin), ce qui aura pour effet d'afficher dans la
+console "Hello, World !!".
+
+Dans l'espace gris foncé (l'éditeur de programme), on va taper :
+
+{CODE :
+
+// Notre premier programme : hello world
+
+code :: "HW"
+
+}
+
+Analysons ce programme très simple : sur la première ligne, c'est simplement un commentaire ; On peut déclarer des
+commentaires unilignes avec "//" et des commentaires multilignes qui commencent par "//*" et qui terminent par "*//".
+Il est recommandé d'écrire l'utilité du fichier en première ligne.
+
+C'est la deuxième ligne qui est la plus intéressante : on déclare ce qui s'appelle une règle. En fait, cela décrit la
+syntaxe de notre langage ; on indique ici à kombu que ledit langage est simplement composé de "HW", et que tout autre
+programme est invalide syntaxiquement.
+La règle 'code' d'un programme kombu est un peu spéciale. C'est l'axiome de notre langage, c'est-à-dire le point de
+départ de tout programme.
+
+
+2.3.2] Afficher "hello world"
+
+"Mais mais mais... Comment je fais pour afficher mon Hello World si mon programme est correct ??"
+Patience ! On va compléter notre code avec cette lignes :
+
+{CODE :
+
+inspect code {
+    print("Hello World !!")
+}
+
+}
+
+On découvre ici notre premier mot-clé : "inspect". En fait, ce mot clé sera à la base de toute la partie syntaxique
+de notr
+
+
+
+

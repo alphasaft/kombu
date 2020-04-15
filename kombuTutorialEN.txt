@@ -1,0 +1,64 @@
+---- Kombu Tutorial ----
+
+
+1.0] What is Kombu ?
+
+1.1] Presentation
+
+Kombu (for Compiler Builder) is a very efficient tool to create your own language. It permits to write your language's
+grammar, but also to program what to do for every instruction.
+
+Its syntax can seem weird, or abnormal compared to other languages, such as python or java, but it allows us to build very
+easily the language you want to create.
+
+If you want to try, read this tutorial !
+
+
+1.2] Requirements
+
+Kombu is a hybrid language, based both on its own syntax but also on that of python. Of course, you need also to learn
+how to program with it, the required level will depend on what you want to do.
+Otherwise, you just need to be motivated !
+
+Let's start !
+
+
+2.0] Bases
+
+2.1] Get started
+
+First we need to create a kombu project. With the “kombu” command, it will be easy to do.
+
+The kombu command allows us to do many things ; Type 'kombu -h' or 'kombu '--help' for a detailed description.
+We will first of all create our first kombu project ; For that, just write “kombu -p HelloWorld” in a cmd.
+It will create a directory named “HelloWorld” containing a main.kb file, and an empty kblibs directory.
+Then move inside using “cd HelloWorld”.
+
+To make it more enjoyable, we will use a kombu editor, with syntactic coloration and many other features.
+Use “kombu -e -f main.kb” to start it.
+
+We can now start to write our first kombu script.
+
+
+2.2] How does Kombu works ?
+
+When you write and compile a kombu script, it will return you a python program out of 3 classes :
+
+- a Parser : Based on mother class "BaseParser", it takes the input, commonly a .cl (created language) file, an return
+an AST object, a way to represent the script easier than a raw text;
+- a NodeWalker : takes the AST object produced by the Parser and evaluates it ;
+- a Compiler : It has only one method , Compiler.compile(src). With the generated Parser and NodeWalker,
+ it parses the input and evaluates the resulting AST.
+
+At the end of this file, you will find these lines (-X- can change):
+
+SRC = "" # Input
+
+myCompiler = -X-Compiler()
+myCompiler.compile(SRC)
+
+Just modify the "# input" line with a script program in your language, and run the script ; It will normally execute it,
+if the base kombu script was correct.
+
+
+2.3]

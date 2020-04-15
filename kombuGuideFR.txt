@@ -1,0 +1,28 @@
+ --- Kombu v1.0 ---
+
+
+Présentation
+
+Kombu (pour Compiler Builder) est un puissant outil de création de langage, prenant un programme kombu en entrée et retournant
+un Compilateur écrit en python en sortie.
+
+Ce compilateur pourra alors parser et évaluer n'importe lequel de vos scripts écrits dans le langage que vous avez créé.
+
+
+
+Installation
+
+Il n'existe malheureusement encore aucun moyen d'installer kombu sur votre ordinateur.
+
+
+Un petit exemple pour la route
+
+
+-- FirstProgram.kb --
+
+
+
+
+
+
+
