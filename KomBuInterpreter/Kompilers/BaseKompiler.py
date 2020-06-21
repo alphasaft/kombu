@@ -29,7 +29,7 @@ class BaseKompiler(object):
 
     def _write(self, string):
         """Write the provided string in the compiled code as a new line, with indentation at the beginning."""
-        self._compiled_python_code += '\n' + ('\t' * self._identation) + string
+        self._compiled_python_code += '\n' + ('    ' * self._identation) + string
 
     def _skip_line(self, n=1):
         """Write an empty line in the compiled code."""

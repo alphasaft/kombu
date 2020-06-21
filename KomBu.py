@@ -4,8 +4,11 @@
 from argparse import ArgumentParser
 import os
 import sys
+from time import time
 from editor import KomBuEditor
 from KomBuInterpreter.Kompilers.KomBuKompiler import KomBuKompiler
+
+# sys.argv = ['kombu', '-c', '-f', '/home/louise/KombuTests/BrainFuck/main.kb']
 
 
 def parse_args():
@@ -33,7 +36,7 @@ os.system('export PYTHONPATH=":/home/louise/anaconda3/lib/python3.7/site-package
 
 if args.editor:
     editor = KomBuEditor()
-    editor.start(args.file)
+    editor.start(args.file or "main.kb" if "main.kb" in os.listdir() else None)
 
 elif args.compile:
 
@@ -45,7 +48,10 @@ elif args.compile:
     filename = args.file.split('/')[-1]
 
     with open(args.file, 'r') as f:
+        bef = time()
         compiled, properties = compiler.kompile(f.read(), base_lib_path, filename)
+        aft = time()
+    print("Successfully compiled (%s seconds)" % str(aft-bef))
 
     if args.display:
         print(compiled)
@@ -53,21 +59,21 @@ elif args.compile:
         with open(args.output, 'w') as f:
             f.write(compiled)
     elif args.execute:
-        with open(args.execute, 'r') as f:
-            exec(compiled.replace('[insert input here]', f.read()))
+        with open(args.execute) as f:
+            compiled = compile(compiled.replace('[insert input here]', f.read()), '<Language-compiler>', 'exec')
+            exec(compiled, locals(), locals())
 
     elif args.read:
-        exec(compiled.replace('[insert input here]', args.read))
-
+        compiled = compile(compiled.replace('[insert input here]', args.read), '<Language-compiler>', 'exec')
+        exec(compiled, locals(), locals())
 
 elif args.project:
-    mkdir_result = os.system('mkdir {} > /dev/null 2>&1'.format(args.project))
-    if mkdir_result == 256:
+    result = os.system('mkdir {} > /dev/null 2>&1'.format(args.project))
+    if result == 256:
         print("Project {} cannot be created ; It mights already exist".format(args.project))
     else:
         os.system('touch {}/main.kb'.format(args.project))
-        os.system('mkdir {}/kblibs'.format(args.project))
+        os.system('cp -r /home/louise/PycharmProjects/KomBu-v1.0/kblibs {}'.format(args.project))
 
 else:
-    raise SyntaxError("Please chose a main mode.")
-
+    raise SyntaxError("Please chose a main mode (either -e (--editor) or -c (--compile)")

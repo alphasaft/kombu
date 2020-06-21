@@ -1,6 +1,4 @@
 from sys import setrecursionlimit
-from utils import time_alert, get_time
-
 setrecursionlimit(1000)
 
 
@@ -27,6 +25,7 @@ def _dict_deepcopy(d, from_node=[]):
             else:
                 new_d[k] = v
     return new_d
+
 
 def _list_deepcopy(l, from_node=[]):
     new_l = []
@@ -58,6 +57,9 @@ class AST:
     def __setitem__(self, key, value):
         self._fields[key] = value
 
+    def __delitem__(self, key):
+        del self._fields[key]
+
     def __repr__(self):
         if self.type:
             return "< '" + self.type + "' AST which corresponds to '" + self.entire_match + "' " + str(self._fields) + " >"
@@ -76,8 +78,19 @@ class AST:
         else:
             return AST(entire_match=self.entire_match, type=self.type, fields=deepcopy(self._fields))
 
+    def pop(self, position):
+        if not position:
+            return self
+        branch = self.get_node(position[:-1])
+        result = branch[position[-1]]
+        del branch[position[-1]]
+        return result
+
     def get(self):
-        return self.entire_match
+        try:
+            return float(self.entire_match)
+        except (ValueError, TypeError):
+            return self.entire_match
 
     def add_node(self, position, name, value):
         ast = [self]
@@ -98,4 +111,3 @@ class AST:
             return ast
         except KeyError:
             return None
-

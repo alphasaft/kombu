@@ -1,5 +1,4 @@
-from Parser.Contexts import Contexts
-from Parser.Errors import Error
+from Parsing.contexts import Contexts
 from sys import setrecursionlimit
 
 setrecursionlimit(10000)
@@ -13,11 +12,10 @@ class BaseParser(Contexts):
         self._properties = {}
 
     def _init_properties(self, **properties):
-            self._properties = properties
+        self._properties = properties
 
     def _end_of_parsing(self):
-        self.errors_stack.append(Error("Invalid Syntax (Got no other information)"))
-        if self._ast:
-            return self._ast['ast']
+        if self._ast and self._cur == len(self.src):
+            return self._ast, self._runtime_warnings
         else:
-            raise self.errors_stack[0]
+            raise self._furthest_error

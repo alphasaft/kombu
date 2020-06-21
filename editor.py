@@ -1,8 +1,8 @@
+# coding=utf-8
 import os
 from tkinter import Tk, Text, Toplevel, Button, IntVar, Entry, Frame, Checkbutton, PhotoImage, LEFT, RIGHT, TOP, BOTTOM
 from KomBuInterpreter.Kompilers.KomBuKompiler import KomBuKompiler
 from utils import catch_output
-
 
 FONT = ('', 12)
 
@@ -11,13 +11,15 @@ class KomBuEditor(Tk):
     def __init__(self):
 
         self.save_list = []
+        self._last_pointer_line = 0
+        self._whole_text = ""
 
         Tk.__init__(self)
 
-        self._editor_frame = Text(master=self, bg='#2D3038', fg='white', height=25, width=131, undo=True)
-        self._editor_frame.grid(row=1, column=2, columnspan=5)
+        self._editor_frame = Text(master=self, bg='#2D3038', fg='white', height=25, width=131, wrap='none', undo=True)
+        self._editor_frame.grid(row=1, column=2, columnspan=6)
 
-        self._navigator = Frame(master=self, height=428, bg="white", width=230)
+        self._navigator = Frame(master=self, height=428, width=230)
         self._navigator.grid(row=1, column=0, columnspan=2)
 
         self._compile_button = Button(master=self, command=self._compile, text='Compile', width=16, height=1)
@@ -45,6 +47,14 @@ class KomBuEditor(Tk):
         self._verbosity_checkbutton = Checkbutton(master=self, variable=self._verbose, text='Verbose output')
         self._verbosity_checkbutton.grid(row=3, column=0)
 
+        self._only_show_kombu_files = IntVar(self, 1)
+        self._only_show_kombu_files_checkbutton = Checkbutton(master=self, variable=self._only_show_kombu_files, text='Only show kombu files', command=self.foo)
+        self._only_show_kombu_files_checkbutton.grid(row=3, column=1, columnspan=2)
+
+        self._compile_main = IntVar(self, 1)
+        self._compile_main_checkbutton = Checkbutton(master=self, variable=self._compile_main, text='Always compile file main.kb')
+        self._compile_main_checkbutton.grid(row=3, column=3, columnspan=2)
+
         self._test_zone = Text(master=self, bg='white', fg='black', height=12, width=80)
         self._test_zone.grid(row=2, column=5, columnspan=2)
 
@@ -67,7 +77,6 @@ class KomBuEditor(Tk):
         Tk.mainloop(self)
 
     def shutdown(self, ctrl_event=None):
-
         self._save()
         self.destroy()
 
@@ -80,19 +89,51 @@ class KomBuEditor(Tk):
             "<Control-o>": self._open,
             "<Control-x>": self._compile,
             "<Control-t>": self._test_code,
+            "<Return>": self._indent,
 
         }.items():
 
             self._editor_frame.bind(ctrl, command)
+        
+    def foo(self):
+        return self.update_navigator()
+
+    def _indent(self, event=None):
+        line = self._editor_frame.index('insert').split('.')[0]
+        pos = line + '.0'
+
+        if self._editor_frame.get(self._editor_frame.index('insert')) != '\n':
+            return
+
+        if (self._editor_frame.get(self._editor_frame.index('insert') + '- 1 chars') == ':' and
+        self._editor_frame.get(self._editor_frame.index('insert') + '- 2 chars') != ':'):
+            indentation = "\t"
+        else:
+            indentation = ""
+
+        while self._editor_frame.get(pos) in ' \t':
+            indentation += self._editor_frame.get(pos)
+            pos = line + '.' + str(int(pos.split('.')[1]) + 1)
+
+        end = len(indentation)
+        while not self._editor_frame.get(pos) == '\n':
+            end += 1
+            pos = line + '.' + str(int(pos.split('.')[1]) + 1)
+
+        self._editor_frame.insert(line + '.' + str(end), '\n'+indentation)
+
+        return 'break'
 
     def update_navigator(self):
-        self._navigator = Frame(master=self, height=428, bg="white", width=230)
-        self._navigator.grid(row=1, column=0, columnspan=2)
+        for widget in self._navigator.winfo_children():
+            widget.destroy()
 
         if self._filepath:
-            other_files = [f for f in os.listdir(self._current_directory_path()) if f.endswith('.kb')]
+            other_files = os.listdir(self._current_directory_path())
             for file in other_files:
-                self._create_menu_entry(file)
+                if ((file.split('.')[-1] in ['txt', 'kb', 'py', 'csv', 'cl'] and self._only_show_kombu_files.get() == 0)\
+                        or file.split('.')[-1] in ['kb', 'cl']) and not file.startswith('.'):
+                    self._create_menu_entry(file)
 
     def _create_menu_entry(self, filename):
         Button(master=self._navigator, text='> '+filename, command=lambda: self._open(self._current_directory_path()+'/'+filename)).pack(side=TOP)
@@ -120,12 +161,21 @@ class KomBuEditor(Tk):
 
     def _compile(self, ctrl_event=None):
         compiler = KomBuKompiler()
+        if self._compile_main.get():
+            self._save()
+            to_compile = open(self._current_directory_path() + '/main.kb', 'r').read()
+            filename = "main.kb"
+        else:
+            to_compile = self._editor_frame.get('1.0', 'end')
+            filename = self._filepath.split('/')[-1]
+
         try:
             if self._filepath:
-                self._compiler_code, self._compiler_properties = compiler.kompile(self._editor_frame.get('1.0', 'end'),
-                                                                                  self._current_directory_path(), self._filepath.split('/')[-1])
+                self._compiler_code, self._compiler_properties = compiler.kompile(to_compile,
+                                                                                  self._current_directory_path(),
+                                                                                  filename)
             else:
-                self._compiler_code, self._compiler_properties = compiler.kompile(self._editor_frame.get('1.0', 'end'),
+                self._compiler_code, self._compiler_properties = compiler.kompile(to_compile,
                                                                      os.getcwd(), 'main.kb')
             self._output.configure(fg='black')
 
@@ -152,8 +202,11 @@ class KomBuEditor(Tk):
         else:
             try:
                 self._output.configure(fg='black')
-                with catch_output(self):
-                    execute(self._test_zone.get('1.0', 'end'), self._compiler_properties['name'], self._compiler_code)
+
+                compiled = compile(self._compiler_code.replace('[insert input here]',
+                                                               self._test_zone.get('1.0', 'end')),
+                                   '/dev/null', 'exec')
+                exec(compiled, locals(), locals())
 
             except Exception as e:
                 self._error('Test : ' + str(e))
@@ -176,21 +229,26 @@ class KomBuEditor(Tk):
             self._output.delete('0.0', 'end')
             self._output.insert('end', self._output_message)
 
+        self._display_current_line()
+
         self.after(100, self._refresh)
 
+    def _display_current_line(self):
+        pass
+
     def _text_syntaxic_coloration(self):
-        self._editor_frame.tag_delete('red', '#0CB7EB', '#E69400', '#D8C437', 'green', 'grey', 'magenta')
-        self._editor_frame.colorize('(inspect|return|with|from|ast|before|after)', '#E69400')
-        self._editor_frame.colorize('//\*(.|\n)*?\*//', 'grey')
-        self._editor_frame.colorize('//[^\n]*\n', 'grey')
-        self._editor_frame.colorize('node \w+(\.\w+)*', '#D8C437')
-        self._editor_frame.colorize('§\w+', "magenta")
-        self._editor_frame.colorize('\$\w+', '#0CB7EB')
-        self._editor_frame.colorize('<\w+?>', 'green')
-        self._editor_frame.colorize('\'.*?\'', 'red')
-        self._editor_frame.colorize('\".*?\"', 'red')
-        self._editor_frame.colorize('/.*?/', 'red')
-        self._editor_frame.colorize('&', '#0CB7EB')
+        self._editor_frame.tag_delete('#0CF08F', '#0CB7EB', '#E69400', '#D8C437', 'red', 'green', 'grey', 'magenta')
+        self._editor_frame.colorize(r'(with|block|test|group|from|inspect|return|before|after|missing|catch|in|it|continue)(?![\w\d])', '#E69400')
+        self._editor_frame.colorize(r'node \w+(\.\w+)*', '#D8C437')
+        self._editor_frame.colorize(r'§\w+', "magenta")
+        self._editor_frame.colorize(r'\$\w+', '#0CB7EB')
+        self._editor_frame.colorize(r'<\w+?>', 'green')
+        self._editor_frame.colorize(r'\'.*?((?!<\\\\)\')', '#0CF08F')
+        self._editor_frame.colorize(r'\".*?\"', '#0CF08F')
+        self._editor_frame.colorize(r'/.*?/', '#0CF08F')
+        self._editor_frame.colorize(r'#\*(.|\n)*?\*#', 'grey')
+        self._editor_frame.colorize(r'#[^\n]*\n', 'grey')
+        self._editor_frame.colorize(r'![\w\d]*', "red")
 
     def _save(self, ctrl_event=None):
         if not self._filepath:
@@ -226,6 +284,9 @@ class KomBuEditor(Tk):
         def new_file():
             self._save()
             filename = filename_entry.get()
+            if '.' not in filename:
+                filename += '.kb'
+
             if "/" in filename:
                 self._error("File name needed, not file path.")
                 return self._create_file()
@@ -233,7 +294,9 @@ class KomBuEditor(Tk):
             try:
                 open(self._current_directory_path()+'/'+filename, 'x')
                 self._open(self._current_directory_path()+'/'+filename)
+                get_filename.destroy()
                 self.update_navigator()
+
             except Exception as e:
                 self._error(e)
 
@@ -310,8 +373,7 @@ def colorize(self, regex, color):
 
 
 def execute(code, name, compiler):
-    exec('global {0}Parser, {0}NodeWalker, {0}Compiler'.format(name))
-    exec(compiler.replace('[insert input here]', code), locals(), locals())
+    exec(compiler.replace('[insert input here]', code[:-1]), locals(), locals())
 
 
 Text.colorize = colorize

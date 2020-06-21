@@ -3,57 +3,49 @@ from KomBuInterpreter.TokenClasses import *
 from utils import escape_quotes, split
 
 
+TEMPLATE = """
+class {0}NodeWalker:
+    {5}
+    
+    {6}
+    
+    def _inspect(self, ast):
+        try:
+            ast.type
+        except AttributeError:
+            raise TypeError('Can only use \"node\" keyword on AST objects')
+            
+        return getattr(self, '_'+ast.type+'_')(ast)
+    
+    {3}
+    def walk(self, ast):
+        {4}
+        try:
+            self._{1}_
+        except AttributeError:
+            print("AST wasn't evaluated.")
+        
+        self.start()
+        self._{1}_(ast)
+        self.end()
+        
+        return ast
+"""
+
+
 class KomBuSemanticsKompiler(BaseKompiler):
-    def compile(self, ast, properties):
-        self._properties = properties
+    def compile(self, ast):
         self._ast = ast.copy()
-        self._write_header()
+        self._write(TEMPLATE)
+        self._indent()
         self._compile_ast()
 
         return self._compiled_python_code
 
-    def _write_header(self):
-        self._write("class {0}NodeWalker:")
-        self._indent()
-        self._compile_initialization()
-        self._write("def _inspect(self, ast):")
-        self._indent()
-        self._write("try:")
-        self._indent()
-        self._write("ast.type")
-        self._dedent()
-        self._write("except AttributeError:")
-        self._indent()
-        self._write("raise SyntaxError('Can only use \"node\" keyword on AST objects')")
-        self._dedent()
-        self._write("return getattr(self, '_'+ast.type+'_')(ast)")
-        self._dedent()
-        self._skip_line(1)
-        if self._properties.get('get_time'):
-            self._write("@get_time")
-        self._write("def walk(self, ast):")
-        self._indent()
-        self._compile_ast_showing()
-        self._write('try:')
-        self._indent()
-        self._write("self._{1}_(ast)")
-        self._write("self.end()")
-        self._dedent()
-        self._write('except IndexError:')
-        self._indent()
-        self._write('print("/!\\ : AST wasn\'t evaluated.")')
-        self._write('return ast')
-        self._dedent()
-        self._dedent()
-        self._compile_end()
-        self._skip_line(1)
+    def compile_initialization(self):
+        self._compiled_python_code = ""
 
-    def _compile_ast_showing(self):
-        if self._properties['show_ast']:
-            self._write("print('Got AST :', ast)")
-
-    def _compile_initialization(self):
-        self._write("def __init__(self):")
+        self._write("def start(self):")
         self._indent()
 
         if not [n for n in self._ast if type(n) is BeforeBlock]:
@@ -72,7 +64,10 @@ class KomBuSemanticsKompiler(BaseKompiler):
         self._dedent()
         self._skip_line(1)
 
-    def _compile_end(self):
+        return self._compiled_python_code
+
+    def compile_end(self):
+        self._compiled_python_code = ""
         self._write("def end(self):")
         self._indent()
 
@@ -91,6 +86,8 @@ class KomBuSemanticsKompiler(BaseKompiler):
 
         self._dedent()
         self._skip_line(1)
+
+        return self._compiled_python_code
 
     def _compile_ast(self):
         for node in self._ast:
@@ -117,10 +114,10 @@ class KomBuSemanticsKompiler(BaseKompiler):
             raise SyntaxError("Error in the SemanticsKompiler code.")
 
     def _compile_global_var(self, node):
-        self._compiled_python_code += "self." + node.name
+        self._compiled_python_code += "self." + node.name + " "
 
     def _compile_uniline_inspection(self, node):
-        self._write("def _{}_(self, ast):".format(node.name))
+        self._write("def _{}_(self, ast):".format(node.whole_name))
         self._indent()
         self._write("return ")
         for subnode in node.definition:
@@ -129,7 +126,7 @@ class KomBuSemanticsKompiler(BaseKompiler):
         self._skip_line(1)
 
     def _compile_multiline_inspection(self, node):
-        self._write("def _{}_(self, ast):".format(node.name))
+        self._write("def _{}_(self, ast):".format(node.whole_name))
         self._indent()
         definition = split(node.definition, NewLine(), include_at_beginning=True)[1:]
         base_indentation = len(definition[0][0].indentation.replace('\t', ' '*16))

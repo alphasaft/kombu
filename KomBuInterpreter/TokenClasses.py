@@ -26,18 +26,17 @@ class BaseToken(object):
 
 
 class EOF(BaseToken):
-    def __eq__(self, other):
+    def __init__(self, pos):
+        self.pos = pos
+
+    @classmethod
+    def equals(cls, other):
         return type(other) is EOF
 
 
-class EOL(BaseToken):
-    def __eq__(self, other):
-        return type(other) is EOL
-
-
 class Code(BaseToken):
-    def __init__(self):
-        self.ast = []
+    def __init__(self, ast=None):
+        self.ast = [] if ast is None else ast
 
     def add(self, block):
         if type(block) is list:
@@ -49,26 +48,37 @@ class Code(BaseToken):
 
 
 class SetConstant(BaseToken):
-    def __init__(self, constantname, value):
+    def __init__(self, constantname, value, pos):
         self.constantname = constantname
         self.value = value
+        self.pos = pos
 
 
 class Import(BaseToken):
-    def __init__(self, toimport):
+    def __init__(self, toimport, pos):
         self.toimport = toimport
+        self.pos = pos
 
 
 class FromImport(BaseToken):
-    def __init__(self, toimport, from_file):
+    def __init__(self, toimport, from_file, pos):
         self.toimport = toimport
         self.from_file = from_file
+        self.pos = pos
+
+
+class Group(BaseToken):
+    def __init__(self, definition, group_name, pos):
+        self.definition = definition
+        self.group_name = group_name
+        self.pos = pos
 
 
 class Choices(BaseToken):
-    def __init__(self):
+    def __init__(self, pos):
         self.options = []
         self.group_name = 'self'
+        self.pos = pos
 
     def __add__(self, other):
         assert type(other) is Option, TypeError("must be Option, not {}".format(str(other.__class__).split('.')[-1][:-3]))
@@ -77,109 +87,172 @@ class Choices(BaseToken):
 
 
 class Option(BaseToken):
-    def __init__(self):
+    def __init__(self, pos):
         self.definition = []
+        self.pos = pos
 
     def add_code(self, definition):
         self.definition.append(definition)
 
 
 class RuleCall(BaseToken):
-    def __init__(self, name, namespace, group_name=None):
+    def __init__(self, name, namespace, pos, group_name=None):
         self.name = name
         self.namespace = namespace
         self.group_name = group_name
+        self.pos = pos
 
+    @property
     def whole_name(self):
         return self.namespace + '__' + self.name
 
 
 class OptionalGroup(BaseToken):
-    def __init__(self, definition):
+    def __init__(self, definition, pos):
         self.definition = definition
         self.group_name = 'self'
+        self.pos = pos
 
 
 class RuleDefinition(BaseToken):
-    def __init__(self, name, namespace, definition, error_handlers):
-        self.name, self.namespace, self.definition, self.error_handlers = name, namespace, definition, error_handlers
+    def __init__(self, name, namespace, definition, pos):
+        self.name, self.namespace, self.definition = name, namespace, definition
+        self.pos = pos
 
+    @property
     def whole_name(self):
         return self.namespace + '__' + self.name
 
 
 class RegexMatch(BaseToken):
-    def __init__(self, regex):
+    def __init__(self, regex, pos):
         self.regex = regex
         self.group_name = None
+        self.pos = pos
 
 
 class Match(BaseToken):
-    def __init__(self, string):
+    def __init__(self, string, pos):
         self.string = string
         self.group_name = None
+        self.pos = pos
 
 
 class UnilineInspection(BaseToken):
-    def __init__(self, name, definition):
+    def __init__(self, name, namespace, definition, pos):
         self.name = name
+        self.namespace = namespace
         self.definition = definition
+        self.pos = pos
+
+    @property
+    def whole_name(self):
+        return self.namespace + '__' + self.name
 
 
 class MultilineInspection(BaseToken):
-    def __init__(self, name, definition):
+    def __init__(self, name, namespace, definition, pos):
         self.name = name
+        self.namespace = namespace
         self.definition = definition
+        self.pos = pos
+
+    @property
+    def whole_name(self):
+        return self.namespace + '__' + self.name
 
 
 class RawPythonCode(BaseToken):
-    def __init__(self, code):
+    def __init__(self, code, pos):
         self.code = code + ' ' if code[-1:].isalpha() else code
+        self.pos = pos
 
 
 class NodeCall(BaseToken):
-    def __init__(self):
+    def __init__(self, pos):
         self.node_path = []
+        self.pos = pos
 
 
 class NewLine(BaseToken):
-    def __init__(self, indentation=''):
+    def __init__(self, pos=("-", 1, 1), indentation=''):
         self.indentation = indentation
+        self.pos = pos
 
     def __eq__(self, other):
         return type(other) is NewLine
 
 
 class BeforeBlock(BaseToken):
-    def __init__(self):
+    def __init__(self, pos):
         self.code = []
+        self.pos = pos
 
 
 class AfterBlock(BaseToken):
-    def __init__(self):
+    def __init__(self, pos):
         self.code = []
+        self.pos = pos
 
 
 class GlobalVar(BaseToken):
-    def __init__(self, name):
+    def __init__(self, name, pos):
         self.name = name
-
-
-class ErrorHandlersStacker(BaseToken):
-    def __init__(self):
-        self.error_handlers = []
-
-    def add_error_handler(self, error_handler):
-        self.error_handlers.append(error_handler)
-
-
-class ErrorHandler(BaseToken):
-    def __init__(self, type, error_msg, **args):
-        self.error_type = type
-        self.args = args
-        self.error_msg = error_msg
+        self.pos = pos
 
 
 class ImportBlock(BaseToken):
-    def __init__(self, main_rule, dependencies):
+    def __init__(self, main_rule, dependencies, pos):
         self.main_rule, self.dependencies = main_rule, dependencies
+        self.pos = pos
+
+
+class ErrorTrigger(BaseToken):
+    def __init__(self, nb, link, pos):
+        """
+        NB is the reference to the generated error.
+        LINK is the part of the rule definition the trigger is bound to.
+        """
+        self.nb = nb
+        self.link = link
+        self.group_name = link.group_name
+        self.pos = pos
+
+
+class WarningTrigger(BaseToken):
+    def __init__(self, nb, link, pos):
+        """
+        NB is the reference to the generated error.
+        LINK is the part of the rule definition the trigger is bound to.
+        """
+        self.nb = nb
+        self.link = link
+        self.group_name = link.group_name
+        self.pos = pos
+
+
+class ErrorCatcher(BaseToken):
+    def __init__(self, msg, etype, ctx_rule, args, pos):
+        self.msg = msg
+        self.etype = etype
+        self.ctx_rule = ctx_rule
+        self.args = args
+        self.pos = pos
+
+    def arg(self, n):
+        return self.args[n]
+
+
+class ErrorCatcherArg(BaseToken):
+    def __init__(self, atype, value, pos):
+        self.type = atype
+        self.value = value
+        self.pos = pos
+
+
+class WarningCatcher(BaseToken):
+    def __init__(self, msg, ctx_rule, nb, pos):
+        self.msg = msg
+        self.ctx_rule = ctx_rule
+        self.nb = nb
+        self.pos = pos

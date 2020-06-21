@@ -1,8 +1,10 @@
 from time import sleep, time
 from re import search
+from contextlib import contextmanager
+from debug import cumulated_time, get_time_cm
+from exceptions import *
 import io
 import sys
-from contextlib import contextmanager
 
 
 @contextmanager
@@ -22,99 +24,57 @@ def replaces(text, *replaces):
     return text
 
 
-def time_alert(max_time=0.005):
-    def decorator(funct):
-        def timed_funct(*args, **kwargs):
-            bef = time()
-            result = funct(*args, **kwargs)
-            end = time()
-            if end - bef > max_time:
-                print("Warning : funct", funct.__name__, "takes more than", max_time, "secs to be executed (", end - bef,
-                      "s).")
-            return result
-
-        return timed_funct
-
-    return decorator
-
-
-def get_time(funct):
-
-    def timed_funct(*args, **kwargs):
-        bef = time()
-        result = funct(*args, **kwargs)
-        aft = time()
-        print("The function", funct.__name__, "takes", aft-bef, 'seconds to be executed.')
-        return result
-
-    return timed_funct
-
-
-@contextmanager
-def get_time_cm(name):
-    bef = time()
-    yield
-    aft = time()
-    print("The section", name, "takes", aft - bef, 'seconds to be executed.')
-
-
-def tracecall(active, waittime):
-    def tracer(funct):
-        def wrapper(*args, **kwargs):
-            if active:
-                print(funct.__name__)
-                sleep(waittime)
-            return funct(*args, **kwargs)
-        return wrapper
-    return tracer
-
-
-def trace(funct):
-    def tracer(object, *args, **kwargs):
-        result = funct(object, *args, **kwargs)
-        object.trace.append(result)
-        return result
-    return trace
-
-
-def isinorder(iterable, string):
-    regex = ""
-    for element in iterable:
-        regex += "("
-        for choice in element[:-1]:
-            if choice[:6] == 'REGEX~':
-                choice = choice[6:]
-                regex += choice + '|'
+def guards_are_present(guards, string):
+    if type(guards) is list:
+        for guard_choice in guards:
+            if guard_choice[:6] == 'REGEX~':
+                m = search("(.|\n)*(?P<match>"+guard_choice[6:]+')', string)
+                if m:
+                    return m.start('match')
             else:
-                regex += "".join([('\\'+l if l in '[()]-^$*?+' else l) for l in choice]) + '|'
-        regex += "".join([("\\"+l if l in '[({}!<>)]^$*-?+' else l) for l in element[-1]]) + ')'
-        regex += '(.|\n)*'
-
-    if search(regex, string):
-        return True
+                m = search("(.\n)*(?P<match>"+"".join(('\\'+l if not l.isalpha() else l for l in guard_choice))+')', string)
+                if m:
+                    return m.start('match')
     else:
-        return False
+        if guards[:6] == 'REGEX~':
+            m = search("(.|\n)*(?P<match>"+guards[6:]+")", string)
+            if m:
+                return m.start('match')
+        else:
+            m = search("(.|\n)*(?P<match>"+"".join(('\\' + l if not l.isalpha() else l for l in guards))+")", string)
+            if m:
+                return m.start('match')
 
 
 def rule(guards=None):
     def decorator(rule_definition):
-        """Decorator for each rule, which permits to call the provided rule only if she can be applied."""
+        """Decorator for each rule, which permits to call the provided rule only if it can be applied."""
         def wrapper(self, name=None, *args, **kwargs):
             """Manage recursion guards and call the rule decorated."""
+
+            self._ctx.append(rule_definition.__name__)
+
             if guards:
-                self._recursion_guards.append(guards)
-                if self._ast and isinorder(reversed(self._recursion_guards), self.src):
+                can_call = guards_are_present(guards, (self.src+" ")[:self.recursion_guards_positions[-1]])
+                if not can_call:
+                    self.errors_stack.append(Error('%s expected' % guards))
+                else:
+                    self.recursion_guards_positions.append(can_call)
+
+                if self._ast and can_call is not None:
                     with self._group(name=name, type=rule_definition.__name__[1:-1]):
                         rule_definition(self, *args, **kwargs)
                 else:
                     self._ast = None
 
-                del self._recursion_guards[-1]
+                del self.recursion_guards_positions[-1]
 
             else:
                 if self._ast:
                     with self._group(name=name, type=rule_definition.__name__[1:-1]):
                         rule_definition(self, *args, **kwargs)
+
+            del self._ctx[-1]
 
         return wrapper
     return decorator
@@ -150,4 +110,47 @@ def split(iterable, spliter, include=False, include_at_beginning=False):
     new_iterable.append(subiterable)
 
     return new_iterable
+
+
+def get_rule(code, rule_name):
+    from KomBuInterpreter.TokenClasses import RuleDefinition
+    rules = [r for r in code.ast if type(r) is RuleDefinition]
+    for rule in rules:
+        if rule.whole_name == rule_name:
+            return rule
+
+
+def warning(ctx_rule, nb):
+    def warning_checker(funct):
+        def wrapper(self, w):
+            if w.ctx[-1][1:-1] == ctx_rule and w.nb == nb:
+                return funct(self, w)
+
+        return wrapper
+    return warning_checker
+
+
+def error(etype, ctx_rule, *args):
+    def error_checker(funct):
+        def wrapper(self, e):
+            if etype == 'missing':
+                if args[0] == 'string':
+                    if isinstance(e, FailedMatch) and e.ctx[-1] == '_'+ctx_rule+'_' and e.expected == args[1]:
+                        return funct(self, e)
+                elif args[1] == 'regex':
+                    if isinstance(e, FailedPattern) and e.ctx[-1][1:-1] == '_'+ctx_rule+'_' and e.expected == args[1]:
+                        return funct(self, e)
+
+            elif etype == 'failed':
+                if not isinstance(e, GeneratedError) and '_'+ctx_rule+'_' in e.ctx[:-1]:
+                    if e.ctx[e.ctx.index('_'+ctx_rule+'_')+1][1:-1].split('__')[-1] == args[0]:
+                        return funct(self, e)
+
+            elif etype == 'generated':
+                if isinstance(e, GeneratedError) and '_'+ctx_rule+'_' == e.ctx[-1] and e.number == args[0]:
+                    return funct(self, e)
+
+
+        return wrapper
+    return error_checker
 

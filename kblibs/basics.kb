@@ -1,0 +1,12 @@
+// This file is a kombu base file. Don't modify it.
+
+// Basics types
+
+ident :: /[a-zA-Z_][a-zA-Z_0-9]*/
+int :: /[0-9]+/
+
+// Strings
+
+SQS :: /'[^']*?'/
+DQS :: /"[^"]*?"/
+string :: (<SQS> | <DQS>)

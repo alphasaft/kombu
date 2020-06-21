@@ -1,3 +1,0 @@
-
-
-code [ line [ [ repeat 6 {error here} : [  display ; ] ] ] ] ]
