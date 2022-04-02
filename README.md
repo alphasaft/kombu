@@ -1,3 +1,1 @@
 # kombu
-
-Zebi
